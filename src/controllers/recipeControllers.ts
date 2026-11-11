@@ -1,85 +1,58 @@
-import dotenv from 'dotenv';
-dotenv.config();
-import OpenAI from 'openai';
+import type { Request, Response } from "express";
+import { generateText, Output, type LanguageModel } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { RecipeRequestSchema, RecipeSchema, UNITS, type Recipe, type RecipeRequest } from "../schemas/recipeSchemas.js";
+import { STANDARD_INGREDIENTS, isStandardIngredient } from "../data/standardIngredients.js";
 
+// Reads OPENAI_API_KEY from the environment.
+const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
-const openaiClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const buildPrompt = ({ name, foods }: RecipeRequest): string => {
+  const foodList = foods.map((food) => (food.quantity ? `${food.quantity} ${food.name}` : food.name)).join(", ");
+  return `Generate a ${name} recipe that uses these foods: ${foodList}.
+
+For every ingredient:
+- quantity is a number and unit is one of: ${UNITS.join(", ")}. Use "each" for countable items such as eggs or bananas.
+- standardName must be copied exactly from this list when the ingredient matches one of its items, otherwise null:
+${STANDARD_INGREDIENTS.join(", ")}
+- Pantry items such as salt, pepper, oil, or spices are allowed and usually have standardName null.`;
+};
+
+// Never trust the model's matching: anything not on the list becomes null ("price unavailable").
+export const normalizeRecipe = (recipe: Recipe): Recipe => ({
+  ...recipe,
+  ingredients: recipe.ingredients.map((ingredient) => {
+    const standard = ingredient.standardName?.trim().toLowerCase() ?? null;
+    return { ...ingredient, standardName: standard && isStandardIngredient(standard) ? standard : null };
+  }),
 });
-interface RecipeResponse {
-    id: string;
-    title: string;
-    servings: number;
-    prepTime: number;
-    cookTime: number;
-    description: string;
-    ingredients: string[];
-    directions: string[];
-}
 
-interface FoodItem {
-    id: string;
-    name: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-    quantity?: string;
-}
+export const generateRecipe = async (
+  request: RecipeRequest,
+  model: LanguageModel = openai(MODEL),
+): Promise<Recipe | null> => {
+  const { output } = await generateText({
+    model,
+    output: Output.object({ schema: RecipeSchema, name: "recipe" }),
+    prompt: buildPrompt(request),
+  });
+  return output ? normalizeRecipe(output) : null;
+};
 
-interface RecipeRequest {
-    id: string;
-    name: "breakfast" | "lunch" | "dinner";
-    foods: FoodItem[];
-}
+export const getRecipe = async (req: Request, res: Response) => {
+  const parsed = RecipeRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid request", details: parsed.error.issues });
+  }
 
-export const getRecipe = async(req: any, res: any) => {
-    if(req.method !== 'GET') {
-        res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const recipe = await generateRecipe(parsed.data);
+    if (!recipe) {
+      return res.status(502).json({ error: "No recipe returned from OpenAI" });
     }
-    const recipeRequest = req.body as RecipeRequest;
-
-    if(!recipeRequest) {
-        res.status(400).json({ error: 'Invalid request' });
-    }
-    //return 400 error if recipeRequest is not valid
-    const name = recipeRequest.name;
-    const foodList = recipeRequest.foods.map((food) => `${food.quantity} ${food.name}`).join(', ');
-    const formatInstructions = `Please put your answer in the following json format:
-       {
-           "title": "Title of the recipe",
-           "servings": "Number of servings",
-           "prepTime": "Prep time in minutes",
-           "cookTime": "Cook time in minutes",
-           "description": "Description of the recipe",
-           "ingredients": ["List of ingredients"],
-           "directions": ["List of directions"]
-       }`
-       const prompt = `Generate a recipe for ${name} that uses the following ingredients: ${foodList}.
-       ${formatInstructions}`;
-
-       const response = await openaiClient.chat.completions.create({
-           model: 'gpt-3.5-turbo',
-           messages: [{ role: 'user', content: prompt }],
-           max_tokens: 1000
-       })
-       console.log(response);
-       if(!response) {
-           res.status(500).json({ error: 'No response from OpenAI' });
-       } else if(!response.choices[0]) {
-           res.status(500).json({ error: 'No response choices from OpenAI' });
-       } else if(!response.choices[0].message) {
-           res.status(500).json({ error: 'No response message from OpenAI' });
-       } else if(!response.choices[0].message.content) {
-           res.status(500).json({ error: 'No response content from OpenAI' });
-       } else {
-        const recipeResponse = JSON.parse(response.choices[0].message.content) as RecipeResponse;
-        if(!recipeResponse) {
-            res.status(500).json({ error: 'Recipe response from OpenAI is not valid' });
-        }
-        res.status(200).json(recipeResponse);
-       }
-}
-
-
-
+    return res.status(200).json(recipe);
+  } catch (error) {
+    console.error("Recipe generation failed:", error);
+    return res.status(502).json({ error: "Recipe generation failed" });
+  }
+};

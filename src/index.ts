@@ -19,7 +19,7 @@ app.use(express.json());
 
 const router = Router();
 router.get("/health", (_req, res) => res.json({ status: "ok" }));
-router.get("/get-recipe", getRecipe);
+router.post("/get-recipe", getRecipe);
 app.use("/api", router);
 
 const PORT = process.env.PORT || 3000;

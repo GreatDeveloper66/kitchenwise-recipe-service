@@ -6,7 +6,9 @@ A microservice that generates recipes from a meal's food list using the OpenAI A
 
 ## Overview
 
-Given a meal (breakfast, lunch, or dinner) and the foods assigned to it in a meal plan, this service asks OpenAI to produce a complete recipe and returns it as structured JSON: title, servings, prep and cook times, description, ingredients, and directions. The service is deployed on Vercel.
+Given a meal (breakfast, lunch, or dinner) and the foods assigned to it in a meal plan, this service asks OpenAI to produce a complete recipe and returns it as structured JSON: title, servings, prep and cook times, description, ingredients, and directions.
+
+Each ingredient comes back as structured data (quantity, unit, and a `standardName`) so it can be matched against grocery price data. `standardName` is filled only when the ingredient matches the standard ingredient list in `src/data/standardIngredients.ts` (copied from the grocery service's price list); otherwise it is `null`, meaning no price is available. The service is deployed on Vercel.
 
 ---
 
@@ -15,7 +17,8 @@ Given a meal (breakfast, lunch, or dinner) and the foods assigned to it in a mea
 - **Runtime:** Node.js
 - **Language:** TypeScript
 - **Framework:** Express 5
-- **AI:** OpenAI API
+- **AI:** OpenAI via the Vercel AI SDK (schema-enforced structured output)
+- **Validation:** Zod
 - **Security:** Helmet, CORS
 - **Deployment:** Vercel
 
@@ -26,7 +29,7 @@ Given a meal (breakfast, lunch, or dinner) and the foods assigned to it in a mea
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/health` | Health check |
-| GET | `/api/get-recipe` | Generate a recipe for a meal |
+| POST | `/api/get-recipe` | Generate a recipe for a meal |
 
 ---
 
@@ -57,10 +60,19 @@ Given a meal (breakfast, lunch, or dinner) and the foods assigned to it in a mea
   prepTime: number      // minutes
   cookTime: number      // minutes
   description: string
-  ingredients: string[]
+  ingredients: {
+    name: string                 // "large eggs"
+    standardName: string | null  // "egg"; null = not in the price list (price unavailable)
+    quantity: number             // 2
+    unit: "g" | "ml" | "oz" | "lb" | "each" | "tsp" | "tbsp" | "cup" | "slice"
+    preparation: string | null   // "scrambled"
+    display: string              // "2 large eggs, scrambled"
+  }[]
   directions: string[]
 }
 ```
+
+Invalid requests return `400` with validation details. If OpenAI fails or returns output that doesn't match the schema, the service returns `502`.
 
 ---
 
@@ -71,6 +83,7 @@ Create a `.env` file in the root of the project with the following variables:
 ```env
 PORT=3000
 OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4o-mini   # optional, this is the default
 CORS_ORIGIN=allowed_frontend_origin
 ```
 
@@ -107,8 +120,8 @@ npm start
 
 ## Known Limitations
 
-- `get-recipe` reads its input from the request body of a GET request; some clients and proxies drop GET bodies, so this will likely move to POST.
-- Ingredients are currently returned as plain strings. Structured ingredients (name, quantity, unit) for matching against grocery data are planned.
+- The standard ingredient list is a copy of the grocery service's price list and must be kept in sync by hand.
+- Pricing comes from a static mock price list; ingredients outside it have no price.
 
 ---
 
