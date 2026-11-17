@@ -116,6 +116,10 @@ npm run build
 npm start
 ```
 
+The server only calls `app.listen()` when `NODE_ENV` is not `production`. On Vercel the exported app is used instead, so `npm start` with `NODE_ENV=production` set locally will not serve requests.
+
+If `CORS_ORIGIN` is not set, CORS allows every origin.
+
 ---
 
 ## Known Limitations

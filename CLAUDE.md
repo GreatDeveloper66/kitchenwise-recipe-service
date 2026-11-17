@@ -28,6 +28,7 @@ Errors: `400 { error, details }` for an invalid body; `502 { error }` when OpenA
 
 ## Rules
 
-- Env: `OPENAI_API_KEY`, `OPENAI_MODEL` (optional, default `gpt-4o-mini`), `CORS_ORIGIN`, `PORT`. Never hardcode or log the API key.
+- Env: `OPENAI_API_KEY`, `OPENAI_MODEL` (optional, default `gpt-4o-mini`), `CORS_ORIGIN` (unset allows every origin), `PORT`. Never hardcode or log the API key.
+- `src/index.ts` only calls `app.listen()` when `NODE_ENV !== "production"`; Vercel uses the default export.
 - `src/data/standardIngredients.ts` is a hand-copied list of `standard_name` values from kitchenwise-grocery-service `data/foods_prices.ts`. Keep it in sync when the price list changes.
 - `vercel.json` lives in `src/`. Vercel reads it only from the project's Root Directory, so check the Vercel project settings before moving or relying on it.
