@@ -10,8 +10,9 @@ const app = express();
 
 app.use(helmet());
 
+// cors() skips CORS headers entirely when origin is falsy, so default to "*" when CORS_ORIGIN is unset or empty.
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN,
+  origin: process.env.CORS_ORIGIN || "*",
 };
 
 app.use(cors(corsOptions));
