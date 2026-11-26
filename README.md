@@ -67,8 +67,10 @@ Each ingredient comes back as structured data (quantity, unit, and a `standardNa
     unit: "g" | "ml" | "oz" | "lb" | "each" | "tsp" | "tbsp" | "cup" | "slice"
     preparation: string | null   // "scrambled"
     display: string              // "2 large eggs, scrambled"
+    estimatedCost: number        // USD, only the amount this recipe uses, rounded to cents
   }[]
   directions: string[]
+  estimatedTotalCost: number     // sum of the ingredient costs, added by the service
 }
 ```
 
@@ -125,7 +127,7 @@ If `CORS_ORIGIN` is not set, CORS allows every origin.
 ## Known Limitations
 
 - The standard ingredient list is a copy of the grocery service's price list and must be kept in sync by hand.
-- Pricing comes from a static mock price list; ingredients outside it have no price.
+- Costs are AI estimates, not store prices: the model estimates each ingredient's cost and the service sums them. They can vary from run to run and should be shown as "estimated".
 
 ---
 

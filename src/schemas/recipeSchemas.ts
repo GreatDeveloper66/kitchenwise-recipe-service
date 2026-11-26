@@ -31,6 +31,10 @@ export const IngredientSchema = z.object({
   unit: z.enum(UNITS),
   preparation: z.string().nullable().describe("e.g. 'diced', 'scrambled', or null"),
   display: z.string().describe("Human-readable line, e.g. '2 large eggs, scrambled'"),
+  estimatedCost: z
+    .number()
+    .nonnegative()
+    .describe("Estimated US supermarket cost in USD for only the amount this recipe uses, not the whole package"),
 });
 
 export const RecipeSchema = z.object({
@@ -46,3 +50,6 @@ export const RecipeSchema = z.object({
 export type RecipeRequest = z.infer<typeof RecipeRequestSchema>;
 export type Ingredient = z.infer<typeof IngredientSchema>;
 export type Recipe = z.infer<typeof RecipeSchema>;
+
+// What the API returns: the model's recipe plus a total the service adds itself.
+export type RecipeResponse = Recipe & { estimatedTotalCost: number };

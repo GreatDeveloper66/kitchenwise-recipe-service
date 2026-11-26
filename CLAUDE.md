@@ -13,11 +13,12 @@ Stack: Node.js, TypeScript, Express 5, OpenAI via the Vercel AI SDK (schema-enfo
 
 `get-recipe` request body: `{ id, name: "breakfast"|"lunch"|"dinner", foods: [{ id, name, calories, protein, carbs, fat, quantity? }] }` (one meal from a meal plan). Validated by `RecipeRequestSchema` in `src/schemas/recipeSchemas.ts`; `foods` must be non-empty.
 
-Response: `{ title, servings, prepTime, cookTime, description, ingredients, directions }`. Each ingredient is `{ name, standardName, quantity, unit, preparation, display }`:
+Response: `{ title, servings, prepTime, cookTime, description, ingredients, directions, estimatedTotalCost }`. Each ingredient is `{ name, standardName, quantity, unit, preparation, display, estimatedCost }`:
 
 - `quantity` is a number and `unit` is one of `g | ml | oz | lb | each | tsp | tbsp | cup | slice`.
 - `standardName` is an exact entry from `src/data/standardIngredients.ts`, or `null` when there is no match (no price available). The service normalizes it after generation and never trusts the model's match.
 - `preparation` is a string or `null`; `display` is the human-readable line.
+- `estimatedCost` is an AI estimate in USD for only the amount the recipe uses (not real store pricing; there is no inventory or price data source). The service rounds each to cents and sums them into `estimatedTotalCost`; it never takes a total from the model. Show these as "estimated".
 
 Errors: `400 { error, details }` for an invalid body; `502 { error }` when OpenAI fails or returns output that doesn't match the schema.
 
@@ -29,6 +30,7 @@ Errors: `400 { error, details }` for an invalid body; `502 { error }` when OpenA
 ## Rules
 
 - Env: `OPENAI_API_KEY`, `OPENAI_MODEL` (optional, default `gpt-4o-mini`), `CORS_ORIGIN` (unset allows every origin), `PORT`. Never hardcode or log the API key.
+- `standardName` still comes from the grocery price list, but is now used only to recognize and combine ingredients, not to price them.
 - `src/index.ts` only calls `app.listen()` when `NODE_ENV !== "production"`; Vercel uses the default export.
 - `src/data/standardIngredients.ts` is a hand-copied list of `standard_name` values from kitchenwise-grocery-service `data/foods_prices.ts`. Keep it in sync when the price list changes.
 - `vercel.json` lives in `src/`. Vercel reads it only from the project's Root Directory, so check the Vercel project settings before moving or relying on it.
