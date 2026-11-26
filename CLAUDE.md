@@ -17,7 +17,7 @@ Response: `{ title, servings, prepTime, cookTime, description, ingredients, dire
 
 - `quantity` is a number and `unit` is one of `g | ml | oz | lb | each | tsp | tbsp | cup | slice`.
 - `standardName` is an exact entry from `src/data/standardIngredients.ts`, or `null` when there is no match (no price available). The service normalizes it after generation and never trusts the model's match.
-- `preparation` is a string or `null`; `display` is the human-readable line.
+- `preparation` is a string or `null` (the service turns the model's text "null" / "none" / empty into a real `null`); `display` is the human-readable line.
 - `estimatedCost` is an AI estimate in USD for only the amount the recipe uses (not real store pricing; there is no inventory or price data source). The service rounds each to cents and sums them into `estimatedTotalCost`; it never takes a total from the model. Show these as "estimated".
 
 Errors: `400 { error, details }` for an invalid body; `502 { error }` when OpenAI fails or returns output that doesn't match the schema.

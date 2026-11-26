@@ -23,10 +23,20 @@ For every ingredient:
 - standardName must be copied exactly from this list when the ingredient matches one of its items, otherwise null:
 ${STANDARD_INGREDIENTS.join(", ")}
 - Pantry items such as salt, pepper, oil, or spices are allowed and usually have standardName null.
-- estimatedCost is the typical US supermarket price in USD of only the amount this recipe uses (not the whole package), as a number. Use 0 for water.`;
+- preparation is the JSON value null when there is nothing to prepare, never the text "null" or "none".
+- estimatedCost is the typical US supermarket price in USD of only the amount this recipe uses (not the whole package), as a number. Use 0 for water.
+
+Every ingredient mentioned in the directions, including salt, pepper, oil, and water, must also appear in the ingredient list.`;
 };
 
 const toCents = (value: number): number => Math.round(value * 100) / 100;
+
+// The model sometimes writes the text "null" (or "none") instead of a JSON null.
+const NO_PREPARATION = new Set(["", "null", "none", "n/a", "undefined"]);
+const normalizePreparation = (value: string | null): string | null => {
+  const trimmed = value?.trim() ?? "";
+  return NO_PREPARATION.has(trimmed.toLowerCase()) ? null : trimmed;
+};
 
 // Never trust the model's matching: anything not on the list becomes null ("price unavailable").
 // Costs are rounded to cents, and the total is summed here instead of taken from the model.
@@ -36,6 +46,7 @@ export const normalizeRecipe = (recipe: Recipe): RecipeResponse => {
     return {
       ...ingredient,
       standardName: standard && isStandardIngredient(standard) ? standard : null,
+      preparation: normalizePreparation(ingredient.preparation),
       estimatedCost: toCents(ingredient.estimatedCost),
     };
   });
@@ -51,6 +62,8 @@ export const generateRecipe = async (
     model,
     output: Output.object({ schema: RecipeSchema, name: "recipe" }),
     prompt: buildPrompt(request),
+    // Lower than the default so the same meal gets steadier cost estimates from run to run.
+    temperature: 0.3,
   });
   return output ? normalizeRecipe(output) : null;
 };
